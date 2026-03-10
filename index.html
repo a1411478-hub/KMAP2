@@ -110,7 +110,7 @@ html,body{height:100%;overflow:hidden}
 .gt{border-collapse:collapse;min-width:100%}
 .gt th{font-size:13px;font-weight:700;color:var(--tx2);padding:5px 2px 3px;text-align:center;border-right:1px solid var(--line);position:sticky;top:0;background:var(--s1);z-index:2;font-family:'DM Mono',monospace;white-space:nowrap;overflow:hidden;}
 .gt th.th-day{position:relative;user-select:none;}
-.gt th.th-day .col-resizer{position:absolute;right:0;top:0;bottom:0;width:5px;cursor:col-resize;z-index:4;}
+.gt th.th-day .col-resizer{position:absolute;right:-3px;top:0;bottom:0;width:10px;cursor:col-resize;z-index:4;}
 .gt th.th-day .col-resizer:hover,.gt th.th-day .col-resizer.dragging{background:var(--amber);opacity:.5;}
 .gt th.th-tdy{color:var(--amber);background:var(--amberb)}.gt th.th-sun{color:var(--red)}.gt th.th-sat{color:var(--blue)}
 .gt td.g-lbl{font-size:13px;font-weight:700;color:var(--tx);padding:0 10px;height:28px;white-space:nowrap;position:sticky;left:0;background:var(--s1);z-index:1;border-right:1px solid var(--line);width:120px;min-width:120px;max-width:120px;overflow:hidden;text-overflow:ellipsis;cursor:pointer}
@@ -687,7 +687,7 @@ function renderGantt(){
       for(var d=1;d<=days;d++){
         var isT=d===today.getDate()&&m===today.getMonth()&&y===today.getFullYear();
         var e=cd[String(d)];
-        cells+='<td class="g-cell'+(isT?' g-tdy':'')+'" data-pid="'+p.id+'" data-fid="'+(p.folderId||'')+'" data-day="'+d+'">'+(e?'<span class="gentry">'+esc(String(e).slice(0,5))+'</span>':'')+'</td>';
+        var cw2=gcw(d);cells+='<td class="g-cell'+(isT?' g-tdy':'')+'" data-pid="'+p.id+'" data-fid="'+(p.folderId||'')+'" data-day="'+d+'" style="width:'+cw2+'px;min-width:'+cw2+'px;max-width:'+cw2+'px">'+(e?'<span class="gentry">'+esc(String(e).slice(0,5))+'</span>':'')+'</td>';
       }
       rows+='<tr>'
         +'<td class="g-lbl" data-pid="'+p.id+'" data-fid="'+(p.folderId||'')+'">'+esc(p.name)+'</td>'
@@ -709,21 +709,23 @@ function renderGantt(){
   el.querySelectorAll('.col-resizer').forEach(function(r){
     var day=+r.dataset.day;
     var th=r.parentElement;
+    function applyWidth(newW){
+      ganttColWidths[day]=newW;
+      localStorage.setItem('kmap_gcw2',JSON.stringify(ganttColWidths));
+      // thを更新
+      th.style.width=newW+'px';th.style.minWidth=newW+'px';th.style.maxWidth=newW+'px';
+      // data-day属性でtdを直接特定
+      el.querySelectorAll('td.g-cell[data-day="'+day+'"]').forEach(function(td){
+        td.style.width=newW+'px';td.style.minWidth=newW+'px';td.style.maxWidth=newW+'px';
+      });
+    }
+    // マウス
     r.addEventListener('mousedown',function(e){
       e.stopPropagation();e.preventDefault();
       var startX=e.clientX,startW=gcw(day);
       r.classList.add('dragging');
       document.body.style.cursor='col-resize';document.body.style.userSelect='none';
-      function onMove(e){
-        var newW=Math.max(28,Math.min(200,startW+(e.clientX-startX)));
-        ganttColWidths[day]=newW;
-        localStorage.setItem('kmap_gcw2',JSON.stringify(ganttColWidths));
-        // この列のthとtdを全部更新
-        th.style.width=newW+'px';th.style.minWidth=newW+'px';th.style.maxWidth=newW+'px';
-        el.querySelectorAll('td.g-cell:nth-child('+(day+1)+')').forEach(function(td){
-          td.style.width=newW+'px';td.style.minWidth=newW+'px';td.style.maxWidth=newW+'px';
-        });
-      }
+      function onMove(e){applyWidth(Math.max(28,Math.min(200,startW+(e.clientX-startX))));}
       function onUp(){
         r.classList.remove('dragging');
         document.body.style.cursor='';document.body.style.userSelect='';
@@ -733,19 +735,18 @@ function renderGantt(){
       document.addEventListener('mousemove',onMove);
       document.addEventListener('mouseup',onUp);
     });
+    // タッチ
     r.addEventListener('touchstart',function(e){
-      e.stopPropagation();
+      e.stopPropagation();e.preventDefault();
       var startX=e.touches[0].clientX,startW=gcw(day);
-      function onMove(e){
-        var newW=Math.max(28,Math.min(200,startW+(e.touches[0].clientX-startX)));
-        ganttColWidths[day]=newW;
-        localStorage.setItem('kmap_gcw2',JSON.stringify(ganttColWidths));
-        th.style.width=newW+'px';th.style.minWidth=newW+'px';th.style.maxWidth=newW+'px';
+      function onMove(e){applyWidth(Math.max(28,Math.min(200,startW+(e.touches[0].clientX-startX))));}
+      function onUp(){
+        document.removeEventListener('touchmove',onMove);
+        document.removeEventListener('touchend',onUp);
       }
-      function onUp(){document.removeEventListener('touchmove',onMove);document.removeEventListener('touchend',onUp);}
-      document.addEventListener('touchmove',onMove,{passive:true});
+      document.addEventListener('touchmove',onMove,{passive:false});
       document.addEventListener('touchend',onUp);
-    },{passive:true});
+    },{passive:false});
   });
 }
 
